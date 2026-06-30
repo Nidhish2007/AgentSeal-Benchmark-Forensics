@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environments
+.venv/
+venv/
+.env
+.env.*
+
+# Build outputs
+build/
+dist/
+*.whl
+*.tar.gz
+
+# AgentSeal runtime/cache outputs
+.agentseal_search_cache/
+.agentseal_cache/
+reports/
+agentseal_reports/
+*.log
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

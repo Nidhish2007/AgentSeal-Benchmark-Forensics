@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+title: AgentSeal
+message: If you use AgentSeal in research or benchmark governance, please cite the repository release.
+type: software
+license: MIT
+authors:
+  - name: AgentSeal Contributors
+version: 5.0.0-beta.2

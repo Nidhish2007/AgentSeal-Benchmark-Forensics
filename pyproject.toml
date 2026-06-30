@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentseal"
+version = "5.0.0"
+description = "AgentSeal — deterministic contamination auditor for AI agent benchmarks."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+authors = [{name = "AgentSeal Contributors"}]
+keywords = ["agent", "benchmark", "contamination", "swe-bench", "llm", "evaluation", "ai-safety", "audit"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Security",
+  "Topic :: Software Development :: Testing",
+]
+dependencies = [
+  "typer>=0.9.0",
+  "rich>=13.5.0",
+  "pydantic>=2.0.0",
+  "pandas>=2.0.0",
+  "pyarrow>=14.0.0",
+  "jinja2>=3.1.0",
+  "requests>=2.28.0",
+  "textual>=0.50.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "build>=1.0", "twine>=4.0"]
+
+[project.urls]
+Homepage = "https://github.com/agentseal/agentseal"
+Repository = "https://github.com/agentseal/agentseal"
+Documentation = "https://github.com/agentseal/agentseal#readme"
+Issues = "https://github.com/agentseal/agentseal/issues"
+
+[project.scripts]
+agentseal = "agentseal.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["agentseal*"]
+
+[tool.setuptools.package-data]
+agentseal = [
+  "data/*.sqlite",
+  "data/*.bloom",
+  "data/*.parquet",
+]
