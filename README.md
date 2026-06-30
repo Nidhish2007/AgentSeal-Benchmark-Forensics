@@ -1,10 +1,69 @@
 # AgentSeal
 
-**Evidence-first contamination-risk auditing for AI-agent benchmarks.**
+**Benchmark forensics auditor for AI-agent evaluations.**
 
-AgentSeal audits benchmark instances for concrete evidence that gold patches, problem statements, test signals, or source artifacts are already present in public code, corpus indexes, forks, mirrors, benchmark harnesses, or downstream datasets. It is built for benchmark maintainers, model evaluators, and researchers who need audit-grade evidence before trusting leaderboard results.
+AgentSeal is a deterministic local auditor for benchmark contamination, corpus exposure, and dataset leakage-risk signals. It asks a simple question before you trust a leaderboard:
 
-> **Status:** public beta. AgentSeal detects contamination-risk evidence layers; behavioral model memorization testing is a separate downstream step.
+> Are the answers, tests, or benchmark artifacts already visible in public code or corpus-like indexes?
+
+AgentSeal does **not** prove model memorization. It measures the exposure surfaces that make contamination possible and reports each evidence class separately.
+
+## SWE-bench Pro Public Audit
+
+AgentSeal audited **731 SWE-bench Pro public instances**.
+
+| Signal | Result | Interpretation |
+| --- | ---: | --- |
+| CodeSeal deterministic content-overlap | 12 instances | Direct bundled-index content-overlap signal |
+| Stack v2 Bloom probable corpus membership | 76 source repos | Probabilistic corpus-membership signal |
+| Public test-signal exposure | 148 instances | Hidden/evaluation test code visible in source PR diffs |
+| Date-unknown public replication | 234 instances | Mixed public-replication triage bucket |
+| Default-branch gold-patch exposure path | 75.4% | Pro consensus/default-branch exposure signal |
+
+The 234 public-replication signal is **not** a proven contamination rate. It can include forks, mirrors, benchmark/eval repos, teaching repos, vendored copies, and organic downstream copies. Treat it as a triage list unless backed by CodeSeal, Bloom, or date-known pre-cutoff temporal evidence.
+
+**Read the public report without installing anything:**
+
+- [SWE-bench Pro corpus-availability audit](docs/reports/swe-bench-pro-audit.md)
+- [Rich HTML report](docs/reports/swe-bench-pro-audit.html)
+
+## Install in One Command
+
+```powershell
+python -m pip install --force-reinstall "https://github.com/Nidhish2007/AgentSeal-/releases/download/v5.0.0-beta.2/agentseal-5.0.0-1beta2fix1-py3-none-any.whl"
+```
+
+Then run:
+
+```powershell
+agentseal
+```
+
+If `agentseal` is not found:
+
+```powershell
+python -m agentseal
+```
+
+Wheel SHA256:
+
+```text
+8f1d0aa5ce09a1967ad49928851eb73320624bc8b1ed344fc762a57cce9fb6fd
+```
+
+## Reproduce the First Audit
+
+Inside the AgentSeal terminal UI:
+
+```text
+/pro 10     Run a quick SWE-bench Pro sample
+/pro        Run the bundled SWE-bench Pro public audit
+/open       Open the latest report
+```
+
+GitHub/HuggingFace tokens are optional. They improve public evidence search and gated dataset loading, but local CodeSeal/Bloom checks can run without pasted tokens when benchmark rows are already local.
+
+> **Status:** public beta / reproducibility release. AgentSeal detects contamination-risk evidence layers; behavioral model memorization testing is a separate downstream step.
 
 ## Highlights
 
@@ -54,11 +113,6 @@ AgentSeal is not limited to one SWE-bench command. In this beta, it is a broader
 - Includes methodology, limitations, evidence classes, and item-level findings.
 - Opens or lists recent reports directly from the terminal UI.
 
-## Public Example Report
-
-- [SWE-bench Pro corpus-availability audit](docs/reports/swe-bench-pro-audit.md)
-- [Rich HTML version](docs/reports/swe-bench-pro-audit.html)
-
 ### Automation and discovery (Beta)
 
 - `/auto` can discover known benchmark sources and cache downloaded datasets locally.
@@ -79,40 +133,17 @@ AgentSeal reports evidence classes separately instead of collapsing every signal
 
 - CodeSeal matches are deterministic content-overlap signals against the packaged local index.
 - Stack v2 Bloom hits are probabilistic repository-membership signals.
-- Independent public-source matches are public-availability evidence unless paired with corpus or temporal signals.
+- Mixed public-source matches are public-availability evidence unless paired with corpus or temporal signals.
 - Test-signal exposure is reported separately from solution exposure.
 
 This makes reports useful for filtering, bucketing, and deeper review without overstating what any single signal proves.
 
-## Install from the beta wheel
-
-Download the wheel from the GitHub beta pre-release, or install it directly:
-
-```powershell
-python -m pip install --force-reinstall "https://github.com/Nidhish2007/AgentSeal-/releases/download/v5.0.0-beta.2/agentseal-5.0.0-1beta2fix1-py3-none-any.whl"
-agentseal
-```
-
-Windows / PowerShell:
+## Local Wheel File
 
 ```powershell
 cd "$env:USERPROFILE\Downloads"
 python -m pip install --upgrade pip
 python -m pip install --force-reinstall ".\agentseal-5.0.0-1beta2fix1-py3-none-any.whl"
-agentseal
-```
-
-macOS / Linux:
-
-```bash
-python3 -m pip install --upgrade pip
-python3 -m pip install --force-reinstall ./agentseal-5.0.0-1beta2fix1-py3-none-any.whl
-agentseal
-```
-
-Fallback launcher:
-
-```bash
 python -m agentseal
 ```
 
