@@ -1,10 +1,10 @@
 # AgentSeal
 
-**Local-first contamination auditing for AI-agent benchmarks.**
+**Evidence-first contamination-risk auditing for AI-agent benchmarks.**
 
-AgentSeal audits benchmark instances for evidence that gold patches, problem statements, or test signals are already present in public or corpus-like sources. It is built for benchmark maintainers, model evaluators, and researchers who need evidence-first contamination reports instead of vague leakage claims.
+AgentSeal audits benchmark instances for concrete evidence that gold patches, problem statements, test signals, or source artifacts are already present in public code, corpus indexes, forks, mirrors, benchmark harnesses, or downstream datasets. It is built for benchmark maintainers, model evaluators, and researchers who need audit-grade evidence before trusting leaderboard results.
 
-> **Status:** public beta. AgentSeal produces audit evidence, not a claim that any specific model memorized a specific item.
+> **Status:** public beta. AgentSeal detects contamination-risk evidence layers; behavioral model memorization testing is a separate downstream step.
 
 ## Highlights
 
@@ -15,12 +15,12 @@ AgentSeal audits benchmark instances for evidence that gold patches, problem sta
 - Optional GitHub evidence verification with exact public URLs
 - Optional HuggingFace dataset loading for `/auto` and `/wizard` workflows
 - JSON, Markdown, and HTML reports
-- Strict evidence-link rendering: broken, placeholder, or unverified URLs are not shown as clickable proof
+- Strict evidence-link rendering: broken, placeholder, or unverified URLs are not shown as evidence
 
 
 ## Capabilities (Beta)
 
-AgentSeal is not limited to one SWE-bench command. In this beta, it can be used as a broader benchmark and dataset contamination audit framework.
+AgentSeal is not limited to one SWE-bench command. In this beta, it is a broader benchmark and dataset contamination-risk audit framework.
 
 ### Built-in benchmark audits (Beta)
 
@@ -50,7 +50,7 @@ AgentSeal is not limited to one SWE-bench command. In this beta, it can be used 
 
 - Produces JSON, Markdown, and HTML reports.
 - Separates corpus signals from independently verified public-source evidence.
-- Suppresses broken, placeholder-like, or unverified evidence URLs instead of presenting them as clickable proof.
+- Suppresses broken, placeholder-like, or unverified evidence URLs instead of presenting them as evidence.
 - Includes methodology, limitations, evidence classes, and item-level findings.
 - Opens or lists recent reports directly from the terminal UI.
 
@@ -68,16 +68,25 @@ AgentSeal is not limited to one SWE-bench command. In this beta, it can be used 
 - Token-like input is redacted in the terminal UI.
 - AgentSeal can still run local CodeSeal/Bloom checks without tokens when the benchmark rows are already local.
 
-### What AgentSeal does not claim
+### Evidence standard
 
-- It does not prove that a specific model memorized a specific benchmark item.
-- It does not claim every public URL is training data.
-- It does not treat Bloom hits as exact proof; Bloom matches are probabilistic corpus-membership signals.
-- It does not render unverifiable or broken evidence links as clickable proof.
+AgentSeal reports evidence classes separately instead of collapsing every signal into one vague "contaminated" label:
+
+- CodeSeal matches are deterministic content-overlap signals against the packaged local index.
+- Stack v2 Bloom hits are probabilistic repository-membership signals.
+- Independent public-source matches are public-availability evidence unless paired with corpus or temporal signals.
+- Test-signal exposure is reported separately from solution exposure.
+
+This makes reports useful for filtering, bucketing, and deeper review without overstating what any single signal proves.
 
 ## Install from the beta wheel
 
-Download the wheel from the latest GitHub Release.
+Download the wheel from the GitHub beta pre-release, or install it directly:
+
+```powershell
+python -m pip install --force-reinstall "https://github.com/Nidhish2007/AgentSeal-/releases/download/v5.0.0-beta.2/agentseal-5.0.0-1beta2fix1-py3-none-any.whl"
+agentseal
+```
 
 Windows / PowerShell:
 
@@ -156,7 +165,7 @@ AgentSeal separates evidence classes:
 - **Stack v2 Bloom:** probabilistic repository-membership signal.
 - **Independent public-source evidence:** exact URLs verified through GitHub/HuggingFace search paths when available.
 
-A report should not show a broken or synthetic evidence URL as clickable proof. If a URL is missing, placeholder-like, or fails strict checks, AgentSeal renders it as `not linked`.
+A report should not show a broken or synthetic evidence URL as evidence. If a URL is missing, placeholder-like, or fails strict checks, AgentSeal renders it as `not linked`.
 
 ## Development from source
 

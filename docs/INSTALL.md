@@ -2,6 +2,13 @@
 
 ## From the beta wheel
 
+Direct GitHub beta pre-release install:
+
+```powershell
+python -m pip install --force-reinstall "https://github.com/Nidhish2007/AgentSeal-/releases/download/v5.0.0-beta.2/agentseal-5.0.0-1beta2fix1-py3-none-any.whl"
+agentseal
+```
+
 Windows / PowerShell:
 
 ```powershell

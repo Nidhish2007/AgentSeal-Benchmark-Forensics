@@ -1,28 +1,28 @@
 # Methodology (Beta)
 
-AgentSeal is an evidence-first contamination auditor. It is designed to answer questions like:
+AgentSeal is an evidence-first contamination-risk auditor. It is designed to answer questions like:
 
 - Is this benchmark instance already visible in public or corpus-like sources?
 - Does the gold patch overlap with code that appears elsewhere?
 - Is the source repository likely present in a large code corpus?
 - Are exact public evidence URLs available and clickable?
-- Which findings are corpus signals, public-source evidence, or weaker heuristics?
+- Which findings are corpus signals, public-source evidence, temporal evidence, or weaker heuristics?
 
-AgentSeal does **not** claim that a specific model memorized a specific item.
+AgentSeal's job is the audit layer before model evaluation: it separates contamination-risk evidence classes so benchmark maintainers can filter, bucket, or investigate affected instances with clear provenance.
 
 ## High-level pipeline
 
 ```text
 input dataset
-→ row/schema normalization
-→ source metadata extraction
-→ source PR or patch retrieval where possible
-→ local text/patch/test checks
-→ CodeSeal local content-overlap lookup
-→ Stack v2 Bloom repository-membership check
-→ optional GitHub/HF public evidence verification
-→ risk scoring
-→ JSON/Markdown/HTML report generation
+-> row/schema normalization
+-> source metadata extraction
+-> source PR or patch retrieval where possible
+-> local text/patch/test checks
+-> CodeSeal local content-overlap lookup
+-> Stack v2 Bloom repository-membership check
+-> optional GitHub/HF public evidence verification
+-> risk scoring
+-> JSON/Markdown/HTML report generation
 ```
 
 ## Input normalization
@@ -59,7 +59,7 @@ This evidence explains where the benchmark item came from. It is not automatical
 
 ### 2. CodeSeal local content-overlap signal
 
-CodeSeal is a local packaged index used to check content-overlap style signals. It can support stronger corpus/content-overlap language than a simple web search, but it should still be presented as an audit signal, not as proof of model memorization.
+CodeSeal is a local packaged index used to check content-overlap style signals. It supports stronger corpus/content-overlap language than simple public search because it is tied to a defined local index.
 
 ### 3. Stack v2 Bloom repository-membership signal
 
@@ -69,7 +69,7 @@ Important limitations:
 
 - Bloom filters are probabilistic.
 - A positive Bloom result is a corpus-membership signal, not exact code-line proof.
-- A negative Bloom result reduces confidence but does not prove absence from every possible training source.
+- A negative Bloom result reduces confidence for the indexed corpus; it is not global absence evidence.
 
 ### 4. Patch/problem/test overlap checks
 
@@ -121,9 +121,9 @@ Before publishing a report, check:
 - No token or local secret is visible.
 - No local path such as `C:\Users\...` is visible unless intentionally included.
 - No clickable evidence URL returns 404.
-- GitHub search pages are not presented as exact proof.
+- GitHub search pages are not presented as exact evidence.
 - Bloom findings are described as probabilistic.
-- The report does not say a model “memorized” an item.
+- Behavioral memorization claims are backed by separate model-behavior testing.
 - The report clearly distinguishes corpus signals from public-source verification.
 
 See [`REPORT_REVIEW_CHECKLIST.md`](REPORT_REVIEW_CHECKLIST.md).

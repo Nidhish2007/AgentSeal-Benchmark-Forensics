@@ -64,8 +64,8 @@ Tokens are optional, but GitHub and HuggingFace tokens make some workflows stron
 
 These use bundled beta datasets from the installed release wheel:
 
-- `/audit` → SWE-bench Verified style audit.
-- `/pro` → SWE-bench Pro style audit.
+- `/audit` -> SWE-bench Verified style audit.
+- `/pro` -> SWE-bench Pro style audit.
 
 The number argument is a sample size:
 
@@ -129,4 +129,4 @@ If your dataset does not contain PR metadata, AgentSeal can still perform local 
 /open
 ```
 
-Read the report before trusting the result. A strong report should have clear evidence classes, no broken clickable links, and no claim that a specific model memorized an item.
+Read the report before trusting the result. A strong report should have clear evidence classes, no broken clickable links, and clear separation between audit evidence and behavioral model testing.

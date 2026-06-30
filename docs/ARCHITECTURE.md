@@ -4,14 +4,14 @@ High-level audit flow:
 
 ```text
 input dataset rows
-→ normalize repo/instance metadata
-→ fetch/parse source PR or patch where available
-→ local checks: patch/problem/test overlap
-→ CodeSeal content-overlap lookup
-→ Stack v2 Bloom repository-membership lookup
-→ optional independent GitHub/HF public-source verification
-→ risk scoring
-→ JSON/Markdown/HTML report generation
+-> normalize repo/instance metadata
+-> fetch/parse source PR or patch where available
+-> local checks: patch/problem/test overlap
+-> CodeSeal content-overlap lookup
+-> Stack v2 Bloom repository-membership lookup
+-> optional independent GitHub/HF public-source verification
+-> risk scoring
+-> JSON/Markdown/HTML report generation
 ```
 
 Evidence is deliberately split into different classes:
@@ -21,4 +21,4 @@ Evidence is deliberately split into different classes:
 - Stack v2 Bloom probable repo-membership evidence;
 - independently verified public-source links.
 
-The report renderer should never present a placeholder or broken URL as clickable proof.
+The report renderer should never present a placeholder or broken URL as clickable evidence.

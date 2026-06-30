@@ -1,6 +1,6 @@
 # Capabilities (Beta)
 
-AgentSeal is not limited to one SWE-bench command. In this beta, it can be used as a broader benchmark and dataset contamination audit framework.
+AgentSeal is not limited to one SWE-bench command. In this beta, it is a broader benchmark and dataset contamination-risk audit framework for finding concrete evidence layers before evaluation.
 
 ### Built-in benchmark audits (Beta)
 
@@ -30,7 +30,7 @@ AgentSeal is not limited to one SWE-bench command. In this beta, it can be used 
 
 - Produces JSON, Markdown, and HTML reports.
 - Separates corpus signals from independently verified public-source evidence.
-- Suppresses broken, placeholder-like, or unverified evidence URLs instead of presenting them as clickable proof.
+- Suppresses broken, placeholder-like, or unverified evidence URLs instead of presenting them as evidence.
 - Includes methodology, limitations, evidence classes, and item-level findings.
 - Opens or lists recent reports directly from the terminal UI.
 
@@ -48,9 +48,13 @@ AgentSeal is not limited to one SWE-bench command. In this beta, it can be used 
 - Token-like input is redacted in the terminal UI.
 - AgentSeal can still run local CodeSeal/Bloom checks without tokens when the benchmark rows are already local.
 
-### What AgentSeal does not claim
+### Evidence standard
 
-- It does not prove that a specific model memorized a specific benchmark item.
-- It does not claim every public URL is training data.
-- It does not treat Bloom hits as exact proof; Bloom matches are probabilistic corpus-membership signals.
-- It does not render unverifiable or broken evidence links as clickable proof.
+AgentSeal separates signals so reviewers can filter, bucket, or escalate instances with the right level of confidence:
+
+- CodeSeal matches are deterministic content-overlap signals.
+- Stack v2 Bloom hits are probabilistic repository-membership signals.
+- Independent public-source matches are public-availability evidence unless paired with corpus or temporal signals.
+- Test-signal exposure is separate from solution exposure.
+
+Behavioral model memorization testing is outside AgentSeal's scope; AgentSeal supplies the audit evidence needed before that step.
