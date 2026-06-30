@@ -32,7 +32,7 @@ The 234 public-replication signal is **not** a proven contamination rate. It can
 ## Install in One Command
 
 ```powershell
-python -m pip install --force-reinstall "https://github.com/Nidhish2007/AgentSeal-/releases/download/v5.0.0-beta.2/agentseal-5.0.0-1beta2fix2-py3-none-any.whl"
+python -m pip install --force-reinstall "https://github.com/Nidhish2007/AgentSeal-Benchmark-Forensics/releases/download/v5.0.0-beta.2/agentseal-5.0.0-1beta2fix2-py3-none-any.whl"
 ```
 
 Then run:

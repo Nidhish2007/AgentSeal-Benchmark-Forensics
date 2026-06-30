@@ -18,7 +18,7 @@ Full report:
 
 Project:
 
-[AgentSeal on GitHub](https://github.com/Nidhish2007/AgentSeal-)
+[AgentSeal on GitHub](https://github.com/Nidhish2007/AgentSeal-Benchmark-Forensics)
 
 ---
 
@@ -231,11 +231,11 @@ AgentSeal is a first open-source step toward that.
 
 GitHub repo:
 
-[https://github.com/Nidhish2007/AgentSeal-](https://github.com/Nidhish2007/AgentSeal-)
+[https://github.com/Nidhish2007/AgentSeal-Benchmark-Forensics](https://github.com/Nidhish2007/AgentSeal-Benchmark-Forensics)
 
 Full SWE-bench Pro audit report:
 
-[https://github.com/Nidhish2007/AgentSeal-/blob/main/docs/reports/swe-bench-pro-audit.md](https://github.com/Nidhish2007/AgentSeal-/blob/main/docs/reports/swe-bench-pro-audit.md)
+[https://github.com/Nidhish2007/AgentSeal-Benchmark-Forensics/blob/main/docs/reports/swe-bench-pro-audit.md](https://github.com/Nidhish2007/AgentSeal-Benchmark-Forensics/blob/main/docs/reports/swe-bench-pro-audit.md)
 
 ---
 

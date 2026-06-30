@@ -14,4 +14,4 @@ Full audit report:
 
 GitHub repository:
 
-[https://github.com/Nidhish2007/AgentSeal-](https://github.com/Nidhish2007/AgentSeal-)
+[https://github.com/Nidhish2007/AgentSeal-Benchmark-Forensics](https://github.com/Nidhish2007/AgentSeal-Benchmark-Forensics)
