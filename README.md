@@ -1,12 +1,14 @@
-# AgentSeal
+# AgentSeal Benchmark Forensics
 
-**Benchmark forensics auditor for AI-agent evaluations.**
+**AgentSeal is an open-source benchmark-forensics auditor for AI-agent evaluations.**
 
-AgentSeal is a deterministic local auditor for benchmark contamination, corpus exposure, and dataset leakage-risk signals. It asks a simple question before you trust a leaderboard:
+AgentSeal audits AI coding benchmarks for contamination-risk, corpus exposure, public replication, and dataset leakage signals. It asks a simple question before you trust a leaderboard:
 
 > Are the answers, tests, or benchmark artifacts already visible in public code or corpus-like indexes?
 
 AgentSeal does **not** prove model memorization. It measures the exposure surfaces that make contamination possible and reports each evidence class separately.
+
+This project is the **benchmark-forensics AgentSeal**. It is not affiliated with unrelated AgentSeal/agent-security projects.
 
 ## SWE-bench Pro Public Audit
 
