@@ -37,40 +37,22 @@ from textual.suggester import SuggestFromList
 from textual.widgets import Footer, Header, Input, RichLog, Static, Label, ListView, ListItem, Tree, Collapsible
 
 # ---------------------------------------------------------------------------
-# ASCII wordmark. The earlier block-art logo looked nice on UTF-8 terminals,
-# but rendered as flashing white garbage on some Windows consoles.
+# Solid filled block wordmark (pyfiglet 'ansi_shadow' font) — heavy █████ blocks
+# No frame (frame made it too wide and got chopped in 80-char terminals).
 # ---------------------------------------------------------------------------
 
 LOGO_LINES = [
-    "     _                    _    _____            _ ",
-    "    / \\   __ _  ___ _ __ | |_ / ____| ___  __ _| |",
-    "   / _ \\ / _` |/ _ \\ '_ \\| __|\\___ \\ / _ \\/ _` | |",
-    "  / ___ \\ (_| |  __/ | | | |_ ____) |  __/ (_| | |",
-    " /_/   \\_\\__, |\\___|_| |_|\\__|_____/ \\___|\\__,_|_|",
-    "         |___/                                      ",
-    "  contamination auditor for ai agent benchmarks      ",
+    " █████╗  ██████╗ ███████╗███╗   ██╗████████╗███████╗███████╗ █████╗ ██╗     ",
+    "██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝██╔════╝██╔════╝██╔══██╗██║     ",
+    "███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║   ███████╗█████╗  ███████║██║     ",
+    "██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║   ╚════██║██╔══╝  ██╔══██║██║     ",
+    "██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║   ███████║███████╗██║  ██║███████╗",
+    "╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝",
+    "                                                                            ",
+    "  ◆━━  contamination auditor for ai agent benchmarks  ━━◆                  ",
 ]
 
 SPINNER_FRAMES = ["|", "/", "-", "\\"]
-
-_TERMINAL_FALLBACKS = str.maketrans({
-    "✓": "v", "✗": "x", "⚠": "!", "●": "*", "○": "o", "■": "#", "▸": ">",
-    "→": ">", "←": "<", "—": "-", "–": "-", "·": "-", "…": "...",
-    "•": "-", "◆": "*", "━": "-", "─": "-", "┌": "+", "┐": "+",
-    "└": "+", "┘": "+", "│": "|",
-})
-
-
-def _terminal_safe_text(value: object) -> str:
-    return str(value).translate(_TERMINAL_FALLBACKS)
-
-
-def _terminal_safe_renderable(value):
-    if isinstance(value, Text):
-        return Text(_terminal_safe_text(value.plain), style=value.style)
-    if isinstance(value, str):
-        return Text(_terminal_safe_text(value))
-    return value
 
 # Slash commands — /wizard opens the file browser panel
 SLASH_COMMANDS = [
@@ -271,7 +253,7 @@ class SealInput(Input):
 class AgentSealApp(App):
     """AgentSeal v5.0.0 — full-screen terminal cockpit."""
 
-    MAX_REASONING_LINES = 2000
+    MAX_REASONING_LINES = 5000
 
     CSS = """
     Screen {
@@ -438,7 +420,7 @@ class AgentSealApp(App):
         # in a dark scrollable RichLog. Ctrl+→ expands, Ctrl+← collapses.
         # This replaces the old separate #thinking-panel + #thinking-label.
         from textual.widgets import Collapsible
-        with Collapsible(id="reasoning-box", title="Reasoning Window (Ctrl+Right to expand)", collapsed=True):
+        with Collapsible(id="reasoning-box", title="▸ Reasoning Window (Ctrl+→ to expand)", collapsed=True):
             yield RichLog(id="reasoning-log", markup=True, wrap=True, auto_scroll=True)
         suggester = SuggestFromList(SLASH_COMMANDS, case_sensitive=False)
         with Container(id="input-bar"):
@@ -508,14 +490,14 @@ class AgentSealApp(App):
     def _render_status(self) -> Text:
         t = Text()
         if self.state.audit_complete:
-            t.append("[complete] audit complete\n", style=f"bold {self.cockpit_theme.accent_2}")
+            t.append("● audit complete\n", style=f"bold {self.cockpit_theme.accent_2}")
         elif self.state.audit_running:
             spinner = SPINNER_FRAMES[self.spinner_frame]
             t.append(f"{spinner} {self.state.phase}\n", style=f"bold {self.cockpit_theme.accent}")
         elif self.state.wizard_unlocked:
-            t.append("[wizard] wizard mode\n", style=f"bold {self.cockpit_theme.accent}")
+            t.append("⚡ wizard mode\n", style=f"bold {self.cockpit_theme.accent}")
         else:
-            t.append("[idle] idle\n", style=self.cockpit_theme.fg_dim)
+            t.append("○ idle\n", style=self.cockpit_theme.fg_dim)
         t.append(f"elapsed {self.state.elapsed():.1f}s\n", style=self.cockpit_theme.fg_dim)
         if self.state.audit_running and self.state.total_instances <= 0:
             msg = (self.state.phase_message or self.state.phase or "preparing").strip()
@@ -536,7 +518,8 @@ class AgentSealApp(App):
     def _log(self, text):
         try:
             log = self.query_one("#conversation", RichLog)
-            text = _terminal_safe_renderable(text)
+            if isinstance(text, str):
+                text = Text(text)
             log.write(text)
         except Exception:
             pass
@@ -2554,9 +2537,9 @@ class AgentSealApp(App):
                     self._reasoning_lines += 1
                 return
             if isinstance(text, str):
-                log.write(Text(_terminal_safe_text(text), style="dim #b0b0b0"))
+                log.write(Text(text, style="dim #b0b0b0"))
             else:
-                log.write(_terminal_safe_renderable(text))
+                log.write(text)
             self._reasoning_lines += 1
         except Exception:
             pass
@@ -2570,11 +2553,11 @@ class AgentSealApp(App):
                 if self.state.audit_running:
                     spinner = SPINNER_FRAMES[self.spinner_frame]
                     phase = self.state.phase[:30] if self.state.phase else "auditing"
-                    box.title = f"{spinner} {phase}  (Ctrl+Right expand / Ctrl+Left collapse)"
+                    box.title = f"{spinner} {phase}  (Ctrl+→ expand · Ctrl+← collapse)"
                 elif self.state.audit_complete:
-                    box.title = "Audit complete  (Ctrl+Right to review reasoning window)"
+                    box.title = f"✓ Audit complete  (Ctrl+→ to review reasoning window)"
                 else:
-                    box.title = "Reasoning Window  (Ctrl+Right to expand)"
+                    box.title = f"▸ Reasoning Window  (Ctrl+→ to expand)"
         except Exception:
             pass
 
@@ -2592,7 +2575,7 @@ class AgentSealApp(App):
             self._reasoning_dropped = 0
             if command_label:
                 from rich.text import Text as _T
-                log.write(_T(f"-- {_terminal_safe_text(command_label)} --", style="bold #ff8c42 on #0a0a0a"))
+                log.write(_T(f"── {command_label} ──", style="bold #ff8c42 on #0a0a0a"))
                 log.write(_T("", style="dim"))
                 self._reasoning_lines = 2
         except Exception:
