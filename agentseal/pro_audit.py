@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
@@ -630,53 +629,51 @@ def audit_swebench_pro(
         on_progress(0, total, f"Detecting default branches for {len(unique_repos)} repos...")
     # serial preflight across unique repos before the actual instance pool,
     # causing large Pro audits to wait on N blocking GitHub API calls upfront.
-    with ThreadPoolExecutor(max_workers=max(1, min(max_workers, len(unique_repos) or 1))) as branch_executor:
-        branch_futures = {branch_executor.submit(_get_default_branch, repo): repo for repo in unique_repos}
-        for future in as_completed(branch_futures):
-            repo = branch_futures[future]
+    from .runtime import iter_bounded_unordered
+
+    branch_workers = max(1, min(max_workers, len(unique_repos) or 1))
+    for repo, branch, exc in iter_bounded_unordered(
+        unique_repos,
+        _get_default_branch,
+        max_workers=branch_workers,
+        max_pending=max(branch_workers * 3, 1),
+        cancel_check=cancel_check,
+    ):
+        if exc is not None or not branch:
+            branch = "main"
+            _default_branch_cache[repo] = branch
+        if on_reasoning:
             try:
-                branch = future.result()
-            except Exception:
-                branch = "main"
-                _default_branch_cache[repo] = branch
-            if on_reasoning:
                 on_reasoning(repo, f"Default branch for {repo}: {branch}")
+            except Exception:
+                pass
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(_audit_single_instance, row, on_reasoning, independent_search): row["instance_id"]
-            for _, row in df.iterrows()
-        }
-        completed = 0
-        cancelled = False
-        # NO warning, and contamination_rate was computed over the surviving
-        # subset — silently misleading. We now record failed ids so the report
-        # can surface how many were dropped and why.
-        failed_ids: list[str] = []
-        for future in as_completed(futures):
-            # Check cancel flag BEFORE processing each result
-            if cancel_check and cancel_check():
-                cancelled = True
-                # Cancel remaining futures that haven't started
-                for f in futures:
-                    f.cancel()
-                break
-            try:
-                result = future.result()
-            except Exception as e:
-                # continuing. The instance is NOT in results, so the report
-                # must call out that N instances were dropped.
-                failed_ids.append(futures[future])
-                continue
-            results.append(result)
+    completed = 0
+    cancelled = False
+    # NO warning, and contamination_rate was computed over the surviving
+    # subset — silently misleading. We now record failed ids so the report
+    # can surface how many were dropped and why.
+    failed_ids: list[str] = []
+    rows = [row for _, row in df.iterrows()]
+    for row, result, exc in iter_bounded_unordered(
+        rows,
+        lambda r: _audit_single_instance(r, on_reasoning, independent_search),
+        max_workers=max_workers,
+        max_pending=max(max_workers * 3, 1),
+        cancel_check=cancel_check,
+    ):
+        if cancel_check and cancel_check():
+            cancelled = True
+            break
+        if exc is not None or result is None:
+            failed_ids.append(str(row.get("instance_id", "unknown")))
             completed += 1
-            if on_progress and (completed % 50 == 0 or completed == total):
-                contaminated = sum(1 for r in results if r.contaminated)
-                on_progress(completed, total, f"{contaminated} contaminated so far")
-
-    if cancelled:
-        # Shutdown the executor immediately (non-blocking)
-        executor.shutdown(wait=False, cancel_futures=True)
+            continue
+        results.append(result)
+        completed += 1
+        if on_progress and (completed % 50 == 0 or completed == total):
+            contaminated = sum(1 for r in results if r.contaminated)
+            on_progress(completed, total, f"{contaminated} contaminated so far")
 
     results.sort(key=lambda r: instance_order.get(r.instance_id, 0))
     # surface it. We stash it as a module-level attribute (the function returns

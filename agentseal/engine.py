@@ -135,7 +135,7 @@ class AgentSealEngine:
         solution_mode = str(getattr(self.config, "audit_type", "pr_diff") or "pr_diff").lower() == "solution"
         self._emit_progress("loading benchmark", 0, total, f"{total} instances to audit")
 
-        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from .runtime import iter_bounded_unordered
         pr_diffs: dict[str, Optional[str]] = {}  # instance_id → pr_diff (or None)
 
         def _fetch_one(inst):
@@ -182,28 +182,54 @@ class AgentSealEngine:
                 except Exception:
                     pass
 
-        with ThreadPoolExecutor(max_workers=min(self._max_workers, max(total, 1)) + 1) as executor:
-            executor.submit(_prewarm_local_artifacts)
-            # None/empty instance_id), not self.instances — invalid instances
-            # crash _fetch_one at inst.pr_number with AttributeError.
-            futures = {executor.submit(_fetch_one, inst): inst for inst in valid_instances}
-            fetched = 0
-            for future in as_completed(futures):
-                if self._cancel_check and self._cancel_check():
-                    for f in futures:
-                        f.cancel()
-                    break
-                inst_id, pr_diff = future.result()
+        # Prewarm local artifacts once, then fetch with bounded pending futures.
+        # Submitting thousands of futures up front can freeze or crash terminals
+        # on full benchmark runs.
+        _prewarm_local_artifacts()
+        fetched = 0
+        fetch_workers = min(self._max_workers, max(total, 1))
+        for _inst, result, exc in iter_bounded_unordered(
+            valid_instances,
+            _fetch_one,
+            max_workers=fetch_workers,
+            max_pending=max(fetch_workers * 3, 1),
+            cancel_check=self._cancel_check,
+        ):
+            if exc is not None or result is None:
+                inst_id = getattr(_inst, "instance_id", "")
+                pr_diffs[inst_id] = None
+            else:
+                inst_id, pr_diff = result
                 pr_diffs[inst_id] = pr_diff
-                fetched += 1
-                if fetched % 10 == 0 or fetched == total:
-                    fetch_label = "checked" if solution_mode else "fetched"
-                    self._emit_progress(source_phase, fetched, total, f"{fetched}/{total} {fetch_label}")
+            fetched += 1
+            if fetched % 10 == 0 or fetched == total:
+                fetch_label = "checked" if solution_mode else "fetched"
+                self._emit_progress(source_phase, fetched, total, f"{fetched}/{total} {fetch_label}")
 
         # instance fetched PR metadata sequentially during scoring, creating one
         # extra blocking GitHub API round trip per instance.
         merge_dates: dict[str, Optional[str]] = {}
-        if total > 0 and not solution_mode and os.environ.get("AGENTSEAL_FETCH_MERGE_DATES", "1").strip().lower() not in {"0", "false", "no", "off"}:
+        merge_env = os.environ.get("AGENTSEAL_FETCH_MERGE_DATES", "auto").strip().lower()
+        merge_forced = merge_env in {"1", "true", "yes", "on", "force"}
+        merge_disabled = merge_env in {"0", "false", "no", "off"}
+        merge_auto_limit = int(os.environ.get("AGENTSEAL_MERGE_DATE_AUTO_LIMIT", "200") or "200")
+        should_fetch_merge_dates = (
+            total > 0
+            and not solution_mode
+            and not merge_disabled
+            and (merge_forced or total <= merge_auto_limit)
+        )
+        if total > 0 and not solution_mode and not should_fetch_merge_dates:
+            if merge_disabled:
+                self._emit_progress("fetching PR metadata", 0, total, "Merge-date fetch disabled")
+            else:
+                self._emit_progress(
+                    "fetching PR metadata",
+                    0,
+                    total,
+                    f"Skipping merge-date fetch for large audit ({total}>{merge_auto_limit}); set AGENTSEAL_FETCH_MERGE_DATES=1 to force",
+                )
+        if should_fetch_merge_dates:
             def _fetch_merge_one(inst):
                 if not inst.pr_number:
                     return inst.instance_id, None
@@ -213,19 +239,24 @@ class AgentSealEngine:
                 except Exception:
                     return inst.instance_id, None
             self._emit_progress("fetching PR metadata", 0, total, "Parallel merge-date fetch...")
-            with ThreadPoolExecutor(max_workers=min(self._max_workers, max(total, 1))) as meta_executor:
-                meta_futures = {meta_executor.submit(_fetch_merge_one, inst): inst for inst in valid_instances if inst.pr_number}
-                meta_done = 0
-                for future in as_completed(meta_futures):
-                    if self._cancel_check and self._cancel_check():
-                        for f in meta_futures:
-                            f.cancel()
-                        break
-                    inst_id, merge_date = future.result()
+            merge_items = [inst for inst in valid_instances if inst.pr_number]
+            meta_workers = min(self._max_workers, max(len(merge_items), 1))
+            meta_done = 0
+            for inst, result, exc in iter_bounded_unordered(
+                merge_items,
+                _fetch_merge_one,
+                max_workers=meta_workers,
+                max_pending=max(meta_workers * 3, 1),
+                cancel_check=self._cancel_check,
+            ):
+                if exc is not None or result is None:
+                    merge_dates[getattr(inst, "instance_id", "")] = None
+                else:
+                    inst_id, merge_date = result
                     merge_dates[inst_id] = merge_date
-                    meta_done += 1
-                    if meta_done % 10 == 0 or meta_done == len(meta_futures):
-                        self._emit_progress("fetching PR metadata", meta_done, len(meta_futures), f"{meta_done}/{len(meta_futures)} merge dates")
+                meta_done += 1
+                if meta_done % 10 == 0 or meta_done == len(merge_items):
+                    self._emit_progress("fetching PR metadata", meta_done, len(merge_items), f"{meta_done}/{len(merge_items)} merge dates")
 
         instance_risks: list[InstanceRisk] = []
         all_evidence: list[ContaminationEvidence] = []
@@ -646,86 +677,89 @@ class AgentSealEngine:
             # GitHub code-search index (bounded by max_results/rate limits). Hits in repos OTHER than the source repo break
             # the circularity of comparing a patch to its own PR diff.
             if self._independent_search and inst.patch:
-                from .independent_search import search_independent_sources
-                iv = search_independent_sources(inst.patch, inst.repo)
-                ir.independent_hits = iv.independent_hits
-                ir.independent_candidate_hits = getattr(iv, "candidate_hits", 0)
-                ir.vendor_like_hits = getattr(iv, "vendor_like_hits", 0)
-                ir.non_vendor_hits = getattr(iv, "non_vendor_hits", iv.independent_hits)
-                if iv.searched:
-                    if iv.independent_hits > 0:
-                        repo_list = ", ".join(iv.independent_repos or [])
-                        candidate_hits = getattr(iv, "candidate_hits", iv.independent_hits)
-                        vendor_hits = getattr(iv, "vendor_like_hits", 0)
-                        non_vendor_hits = getattr(iv, "non_vendor_hits", iv.independent_hits)
-                        self._emit_reasoning(inst.instance_id,
-                            f"  ✓ INDEPENDENT: exact changed lines verified in {iv.independent_hits} repo(s) "
-                            f"OTHER than {inst.repo} ({non_vendor_hits} non-vendor, {vendor_hits} vendor-like; "
-                            f"{candidate_hits} search candidates): {repo_list}")
-                        # Add non-circular evidence. Prefer the exact verified
-                        # GitHub file URL that was fetched and line-checked; only
-                        # fall back to a replay search when no exact URL is present.
-                        verified_urls = list(getattr(iv, "verified_urls", None) or [])
-                        verified_sources = list(getattr(iv, "verified_sources", None) or [])
-                        exact_url = (
-                            verified_urls[0]
-                            if verified_urls else
-                            (verified_sources[0].get("html_url", "") if verified_sources else "")
-                        )
-                        matched_line_total = sum(int(h.get("matched_lines", 0) or 0) for h in verified_sources)
-                        total_line_total = sum(int(h.get("total_lines", 0) or 0) for h in verified_sources)
-                        ev = ContaminationEvidence(
-                            instance_id=inst.instance_id,
-                            match_type=MatchType.INDEPENDENT_SOURCE_HIT,
-                            source_url=exact_url,
-                            source_repo=repo_list,
-                            similarity=1.0,
-                            matched_lines=matched_line_total or iv.independent_hits,
-                            total_lines=total_line_total or candidate_hits,
-                            evidence_snippet=(iv.query_8gram or "")[:200],
-                            message=(
-                                f"Exact changed lines verified in {iv.independent_hits} independent repo(s) "
-                                f"({non_vendor_hits} non-vendor, {vendor_hits} vendor-like; "
-                                f"{candidate_hits} search candidates): {repo_list}"
-                            ),
-                            source_kind="github_code_search_verified",
-                            verification_status=getattr(iv, "verification_mode", "exact_changed_lines") or "exact_changed_lines",
-                            vendor_like=vendor_hits > 0 and non_vendor_hits == 0,
-                            scope_note=(
-                                "Verified hits appear vendor-like/dependency-copy only; treat as public availability, "
-                                "not benchmark-specific leakage."
-                                if vendor_hits > 0 and non_vendor_hits == 0 else
-                                "Exact changed lines verified outside the source repository."
-                            ),
-                        )
-                        evidence_for_inst.append(ev)
-                        # Bump risk: independent evidence is strong.
-                        # >=3 non-vendor exact repos = CRITICAL; >=1 exact repo = at least HIGH.
-                        # Vendor-like dependency copies are public availability, but not
-                        # benchmark-specific leakage by themselves.
-                        if non_vendor_hits >= 3 and ir.risk != RiskLevel.CRITICAL:
-                            ir.risk = RiskLevel.CRITICAL
-                        elif ir.risk in (RiskLevel.LOW, RiskLevel.MEDIUM, RiskLevel.CLEAN):
-                            ir.risk = RiskLevel.HIGH
-                        ir.evidence_count = len(evidence_for_inst)
-                        # above can OVERWRITE the temporal downgrade applied by
-                        # score_instance (which caps post-cutoff patches at
-                        # HIGH, since they cannot be in the training corpus).
-                        # Re-apply the temporal cap here so a post-cutoff patch
-                        # is never reported CRITICAL on independent evidence
-                        # alone (it's strong, but it still can't be in that
-                        # specific corpus).
-                        _cutoff = getattr(self.config, 'model_cutoff', '2024-03-15')
-                        if merge_date and _cutoff and _date_gte(merge_date, _cutoff):
-                            if ir.risk == RiskLevel.CRITICAL:
+                try:
+                    from .independent_search import search_independent_sources
+                    iv = search_independent_sources(inst.patch, inst.repo)
+                    ir.independent_hits = iv.independent_hits
+                    ir.independent_candidate_hits = getattr(iv, "candidate_hits", 0)
+                    ir.vendor_like_hits = getattr(iv, "vendor_like_hits", 0)
+                    ir.non_vendor_hits = getattr(iv, "non_vendor_hits", iv.independent_hits)
+                    if iv.searched:
+                        if iv.independent_hits > 0:
+                            repo_list = ", ".join(iv.independent_repos or [])
+                            candidate_hits = getattr(iv, "candidate_hits", iv.independent_hits)
+                            vendor_hits = getattr(iv, "vendor_like_hits", 0)
+                            non_vendor_hits = getattr(iv, "non_vendor_hits", iv.independent_hits)
+                            self._emit_reasoning(inst.instance_id,
+                                f"  ✓ INDEPENDENT: exact changed lines verified in {iv.independent_hits} repo(s) "
+                                f"OTHER than {inst.repo} ({non_vendor_hits} non-vendor, {vendor_hits} vendor-like; "
+                                f"{candidate_hits} search candidates): {repo_list}")
+                            # Add non-circular evidence. Prefer the exact verified
+                            # GitHub file URL that was fetched and line-checked; only
+                            # fall back to a replay search when no exact URL is present.
+                            verified_urls = list(getattr(iv, "verified_urls", None) or [])
+                            verified_sources = list(getattr(iv, "verified_sources", None) or [])
+                            exact_url = (
+                                verified_urls[0]
+                                if verified_urls else
+                                (verified_sources[0].get("html_url", "") if verified_sources else "")
+                            )
+                            matched_line_total = sum(int(h.get("matched_lines", 0) or 0) for h in verified_sources)
+                            total_line_total = sum(int(h.get("total_lines", 0) or 0) for h in verified_sources)
+                            ev = ContaminationEvidence(
+                                instance_id=inst.instance_id,
+                                match_type=MatchType.INDEPENDENT_SOURCE_HIT,
+                                source_url=exact_url,
+                                source_repo=repo_list,
+                                similarity=1.0,
+                                matched_lines=matched_line_total or iv.independent_hits,
+                                total_lines=total_line_total or candidate_hits,
+                                evidence_snippet=(iv.query_8gram or "")[:200],
+                                message=(
+                                    f"Exact changed lines verified in {iv.independent_hits} independent repo(s) "
+                                    f"({non_vendor_hits} non-vendor, {vendor_hits} vendor-like; "
+                                    f"{candidate_hits} search candidates): {repo_list}"
+                                ),
+                                source_kind="github_code_search_verified",
+                                verification_status=getattr(iv, "verification_mode", "exact_changed_lines") or "exact_changed_lines",
+                                vendor_like=vendor_hits > 0 and non_vendor_hits == 0,
+                                scope_note=(
+                                    "Verified hits appear vendor-like/dependency-copy only; treat as public availability, "
+                                    "not benchmark-specific leakage."
+                                    if vendor_hits > 0 and non_vendor_hits == 0 else
+                                    "Exact changed lines verified outside the source repository."
+                                ),
+                            )
+                            evidence_for_inst.append(ev)
+                            # Bump risk: independent evidence is strong.
+                            # >=3 non-vendor exact repos = CRITICAL; >=1 exact repo = at least HIGH.
+                            # Vendor-like dependency copies are public availability, but not
+                            # benchmark-specific leakage by themselves.
+                            if non_vendor_hits >= 3 and ir.risk != RiskLevel.CRITICAL:
+                                ir.risk = RiskLevel.CRITICAL
+                            elif ir.risk in (RiskLevel.LOW, RiskLevel.MEDIUM, RiskLevel.CLEAN):
                                 ir.risk = RiskLevel.HIGH
-                    else:
+                            ir.evidence_count = len(evidence_for_inst)
+                            # above can OVERWRITE the temporal downgrade applied by
+                            # score_instance (which caps post-cutoff patches at
+                            # HIGH, since they cannot be in the training corpus).
+                            # Re-apply the temporal cap here so a post-cutoff patch
+                            # is never reported CRITICAL on independent evidence
+                            # alone (it's strong, but it still can't be in that
+                            # specific corpus).
+                            _cutoff = getattr(self.config, 'model_cutoff', '2024-03-15')
+                            if merge_date and _cutoff and _date_gte(merge_date, _cutoff):
+                                if ir.risk == RiskLevel.CRITICAL:
+                                    ir.risk = RiskLevel.HIGH
+                        else:
+                            self._emit_reasoning(inst.instance_id,
+                                f"  ✓ independent search ran: 0 hits in other repos "
+                                f"(patch not replicated elsewhere on GitHub)")
+                    elif iv.error:
                         self._emit_reasoning(inst.instance_id,
-                            f"  ✓ independent search ran: 0 hits in other repos "
-                            f"(patch not replicated elsewhere on GitHub)")
-                elif iv.error:
-                    self._emit_reasoning(inst.instance_id,
-                        f"  ⚠ independent search skipped: {iv.error}")
+                            f"  ⚠ independent search skipped: {iv.error}")
+                except Exception as exc:
+                    self._emit_reasoning(inst.instance_id, f"  ⚠ independent search failed: {exc}")
 
             if self._independent_search and _issue_search_enabled() and inst.problem_statement and len(inst.problem_statement) > 50:
                 try:
