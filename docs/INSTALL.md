@@ -3,7 +3,7 @@
 ## Fast Install
 
 ```powershell
-python -m pip install --force-reinstall "https://github.com/Nidhish2007/AgentSeal-Benchmark-Forensics/releases/download/v5.0.0-beta.2/agentseal-5.0.0-1beta2fix4-py3-none-any.whl"
+python -m pip install --force-reinstall "https://github.com/Nidhish2007/AgentSeal-Benchmark-Forensics/releases/download/v5.0.0-beta.2/agentseal-5.0.0-1beta2fix5-py3-none-any.whl"
 agentseal
 ```
 
@@ -16,7 +16,7 @@ python -m agentseal
 Wheel SHA256:
 
 ```text
-c9ff9d6ecf99bb18fd4a16725e08f70962ad00bf9f7a2154bda686ed648fbf79
+6128d19f2e09bfdc061b240b96e2678df785e5937c0b8306e7cc2f6b8ec3ffda
 ```
 
 ## Reproduce the Public Example
@@ -38,7 +38,7 @@ If you downloaded the wheel manually:
 ```powershell
 cd "$env:USERPROFILE\Downloads"
 python -m pip install --upgrade pip
-python -m pip install --force-reinstall ".\agentseal-5.0.0-1beta2fix4-py3-none-any.whl"
+python -m pip install --force-reinstall ".\agentseal-5.0.0-1beta2fix5-py3-none-any.whl"
 python -m agentseal
 ```
 
